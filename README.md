@@ -25,6 +25,7 @@ Other scripts:
 
 ```bash
 npm test             # token layer + money formatting + client fetch wrapper (vitest)
+npm run test:e2e     # 14 browser tests of the cases below (Playwright; starts the dev server if needed, ~2 min)
 npm run typecheck
 npm run lint
 npm run build
@@ -69,7 +70,7 @@ tests/**                         token rotation, money, client wrapper
 
 ## How to observe each case
 
-Most of these are invisible in ordinary use. Open DevTools → Network (tick "Preserve log") for the browser ones. The access token lives 60 seconds, so "wait for expiry" means about a minute.
+Most of these are invisible in ordinary use. Open DevTools → Network (tick "Preserve log") for the browser ones. The access token lives 60 seconds, so "wait for expiry" means about a minute. Every row in the browser table except double-submit is also an automated test in `e2e/console.spec.ts`, so `npm run test:e2e` is the fastest way to see them pass; the manual steps are for watching one happen.
 
 ### Server-side, from the terminal
 
@@ -128,4 +129,8 @@ Extra ones you can do by hand:
 tests/tokens.test.ts       rotation, expiry, absolute lifetime, revocation, concurrent grace, reuse detection
 tests/client-api.test.ts   401 → refresh → retry, single-flight, cross-tab skip, which failures sign out and which do not
 tests/money.test.ts        Indian grouping, paise exactness, negatives, exponents 0/2/3, rejection of decimals
+e2e/console.spec.ts        real browser: expiry mid-session (simulated and real 60 s), two tabs, cross-tab sign-out,
+                           grace window, reuse detection, deep links, 403 for viewer, stale banner on server failure,
+                           refetch on focus, not-found
 ```
+The browser suite needs Chromium: `npx playwright install chromium` once, if it is not already present.

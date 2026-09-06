@@ -45,3 +45,7 @@ next-env.d.ts
 
 # assessment brief is confidential; keep it out of the public repo
 /public/*.pdf
+
+# playwright
+/test-results/
+/playwright-report/
