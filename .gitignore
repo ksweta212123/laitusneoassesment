@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local PGlite database (dev only)
+/.data/
+
+# assessment brief is confidential; keep it out of the public repo
+/public/*.pdf
