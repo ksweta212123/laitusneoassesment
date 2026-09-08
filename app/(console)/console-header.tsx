@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { Button, Logo } from "@/app/_ui";
 import { api, signOut } from "@/lib/client/api";
 import { useSession } from "@/lib/client/session-provider";
 
@@ -20,23 +21,26 @@ export function ConsoleHeader() {
   }
 
   return (
-    <header className="border-b border-zinc-200 bg-white">
-      <div className="mx-auto flex w-full max-w-5xl items-center justify-between p-4">
-        <Link href="/merchants" className="font-semibold">
-          Udyogpay Console
+    <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/85 backdrop-blur">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-3">
+        <Link href="/merchants" className="rounded-md">
+          <Logo />
         </Link>
-        <div className="flex items-center gap-4 text-sm">
+
+        <div className="flex items-center gap-3">
           {me ? (
-            <span>
-              {me.user.name}{" "}
-              <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs uppercase text-zinc-600">{me.user.role}</span>
+            <span className="flex items-center gap-2 text-sm">
+              <span className="hidden font-medium text-slate-700 sm:inline">{me.user.name}</span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium tracking-wide text-slate-600 uppercase">
+                {me.user.role}
+              </span>
             </span>
           ) : (
-            <span className="text-zinc-400">…</span>
+            <span aria-hidden className="h-5 w-28 animate-pulse rounded bg-slate-200" />
           )}
-          <button type="button" onClick={onSignOut} disabled={signingOut} className="underline disabled:opacity-50">
+          <Button type="button" onClick={onSignOut} disabled={signingOut} variant="secondary" size="sm">
             Sign out
-          </button>
+          </Button>
         </div>
       </div>
     </header>

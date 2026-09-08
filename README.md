@@ -1,6 +1,6 @@
 # Udyogpay operator console
 
-Three screens: sign in, merchant list, merchant detail. Everything interesting is in the layer that keeps an operator signed in. See [NOTES.md](./NOTES.md) for the reasoning; this file is how to run it and how to see each case.
+A public landing page plus three screens behind sign-in: merchant list, merchant detail, and the login itself. Everything interesting is in the layer that keeps an operator signed in. See [NOTES.md](./NOTES.md) for the reasoning; this file is how to run it and how to see each case.
 
 **Deployed URL:** _see the covering email_ (fill in after `vercel deploy`, section "Deploying").
 
@@ -41,7 +41,7 @@ npm run build
 
 ## Stack
 
-- Next.js 16 App Router, TypeScript, Tailwind (unstyled-ish on purpose).
+- Next.js 16 App Router, TypeScript, Tailwind v4. One accent colour and one neutral ramp, declared as `@theme` tokens in `app/globals.css`; no component library.
 - Backend: route handlers in the same app under `app/api/`. They are the only code that touches the data source.
 - Data: in-memory mock data by default; Postgres via Drizzle (Neon, PGlite, anything) when `DATABASE_URL` is set. One switch, `lib/server/data-source.ts`, and both sides return the same shapes.
 - Tokens: signed JWT access token (HS256 via `jose`, 60 s by default) + opaque refresh token (SHA-256 stored, 7 days, rotated on every use). Both in `httpOnly` cookies. The lifecycle (`lib/server/auth/tokens.ts`) is our code; `jose` only signs and verifies.
@@ -49,6 +49,9 @@ npm run build
 ## Where things are
 
 ```
+app/page.tsx                     public landing page (the only page outside the proxy)
+app/not-found.tsx                404
+app/_ui/index.tsx                Logo, Button, ButtonLink, Card, PageHeader
 proxy.ts                         optimistic gate for page navigations (no DB access)
 lib/server/auth/tokens.ts        the token lifecycle: issue, rotate, grace window, reuse detection
 lib/server/auth/jwt.ts           access token sign/verify
@@ -64,9 +67,21 @@ lib/client/session-channel.ts    cross-tab sign-out / refresh announcements
 lib/client/use-api-query.ts      data hook: refetch on focus, keep stale data on failure
 lib/money/money.ts               Money type, BigInt arithmetic, Indian formatting
 app/api/**                       the backend
+app/login/**                     split-screen sign-in
 app/(console)/**                 merchant list + detail
 tests/**                         token rotation, money, client wrapper
 ```
+
+## Routes
+
+| Path             | Who can see it            | What it is                                                        |
+| ---------------- | ------------------------- | ----------------------------------------------------------------- |
+| `/`              | anyone                    | Landing page. Demo credentials, and what the token layer does.    |
+| `/login`         | signed-out                | Sign-in. Signed-in visitors are redirected into the console.      |
+| `/merchants`     | any operator              | The list: code, name, city, status, settled total, count.         |
+| `/merchants/:id` | any operator              | Detail, transactions, and the admin-only suspend / reinstate.     |
+
+`/` is deliberately outside the proxy's matcher, so it stays reachable and cheap when signed out. It reads the refresh cookie only to decide whether its button says "Sign in" or "Open console" — the same optimism the proxy uses, and the API is still the authority.
 
 ## Configuration
 

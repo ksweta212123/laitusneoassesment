@@ -1,1 +1,52 @@
 @import "tailwindcss";
+
+/*
+ * One accent, one neutral ramp, one radius scale. Everything else is Tailwind's
+ * defaults. Keeping the palette this small is what makes the console read as
+ * one product rather than a pile of components.
+ */
+@theme {
+  --color-brand-50: oklch(0.962 0.018 272.314);
+  --color-brand-100: oklch(0.93 0.034 272.788);
+  --color-brand-200: oklch(0.87 0.065 274.039);
+  --color-brand-300: oklch(0.785 0.115 274.713);
+  --color-brand-400: oklch(0.673 0.182 276.935);
+  --color-brand-500: oklch(0.585 0.233 277.117);
+  --color-brand-600: oklch(0.511 0.262 276.966);
+  --color-brand-700: oklch(0.457 0.24 277.023);
+  --color-brand-800: oklch(0.398 0.195 277.366);
+  --color-brand-900: oklch(0.359 0.144 278.697);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@layer base {
+  /* One visible focus treatment everywhere, including for keyboard users in tables. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-brand-100);
+    color: var(--color-brand-900);
+  }
+
+  /* Money and identifiers must never reflow as digits change. */
+  .nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
