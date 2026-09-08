@@ -6,7 +6,7 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
   return (
     <SessionProvider>
       <ConsoleHeader />
-      <main className="mx-auto w-full max-w-5xl flex-1 p-6">{children}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>
     </SessionProvider>
   );
 }

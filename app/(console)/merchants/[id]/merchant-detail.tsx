@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { Button, Card } from "@/app/_ui";
 import { api } from "@/lib/client/api";
 import { useSession } from "@/lib/client/session-provider";
 import { useApiQuery } from "@/lib/client/use-api-query";
@@ -15,69 +16,112 @@ export function MerchantDetailView({ id }: { id: string }) {
 
   return (
     <>
-      <p className="mb-4 text-sm">
-        <Link href="/merchants" className="underline">
-          ← All merchants
-        </Link>
-      </p>
+      <Link
+        href="/merchants"
+        className="mb-5 inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-900"
+      >
+        <span aria-hidden>←</span> All merchants
+      </Link>
+
       <QueryStatus {...query} />
-      {!merchant && !query.error && <p className="text-sm text-zinc-500">Loading…</p>}
+
+      {!merchant && !query.error && (
+        <div aria-hidden className="space-y-4">
+          <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
+          <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
+        </div>
+      )}
+
       {merchant && (
         <>
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-semibold">
-                {merchant.name} <StatusBadge status={merchant.status} />
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold tracking-tight text-slate-900">
+                {merchant.name}
+                <StatusBadge status={merchant.status} />
               </h1>
-              <p className="text-sm text-zinc-600">
-                {merchant.legalName} · {merchant.city} · GSTIN {merchant.gstin} ·{" "}
-                <span className="font-mono text-xs">{merchant.code}</span>
+              {/* Kept on one line so "GSTIN <value>" stays a single contiguous string. */}
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500">
+                <span>{merchant.legalName}</span>
+                <span aria-hidden>·</span>
+                <span>{merchant.city}</span>
+                <span aria-hidden>·</span>
+                <span className="nums">GSTIN {merchant.gstin}</span>
+                <span aria-hidden>·</span>
+                <span className="nums font-mono text-xs">{merchant.code}</span>
               </p>
             </div>
             <StatusControl id={merchant.id} status={merchant.status} onChanged={query.reload} />
           </div>
 
-          <dl className="mb-6 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-            <Stat label="Settled" value={formatMoney(merchant.settledTotal)} />
+          <dl className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Stat label="Settled" value={formatMoney(merchant.settledTotal)} emphasis />
             <Stat label="Pending" value={formatMoney(merchant.pendingTotal)} />
             <Stat label="Transactions" value={String(merchant.transactionCount)} />
             <Stat label="Onboarded" value={new Date(merchant.createdAt).toLocaleDateString("en-IN")} />
           </dl>
 
-          <h2 className="mb-2 font-semibold">Recent transactions</h2>
-          <table className="w-full border-collapse bg-white text-sm">
-            <thead>
-              <tr className="border-b border-zinc-200 text-left">
-                <th className="p-2">Reference</th>
-                <th className="p-2">When</th>
-                <th className="p-2">Status</th>
-                <th className="p-2 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {merchant.transactions.map((t) => (
-                <tr key={t.id} className="border-b border-zinc-100">
-                  <td className="p-2 font-mono text-xs">{t.reference}</td>
-                  <td className="p-2">{new Date(t.createdAt).toLocaleString("en-IN")}</td>
-                  <td className="p-2">
-                    <StatusBadge status={t.status} />
-                  </td>
-                  <td className="p-2 text-right font-mono tabular-nums">{formatMoney(t.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Recent transactions</h2>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/70 text-left">
+                    <th scope="col" className="px-4 py-2.5 text-xs font-medium tracking-wide text-slate-500 uppercase">
+                      Reference
+                    </th>
+                    <th scope="col" className="px-4 py-2.5 text-xs font-medium tracking-wide text-slate-500 uppercase">
+                      When
+                    </th>
+                    <th scope="col" className="px-4 py-2.5 text-xs font-medium tracking-wide text-slate-500 uppercase">
+                      Status
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-4 py-2.5 text-right text-xs font-medium tracking-wide text-slate-500 uppercase"
+                    >
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {merchant.transactions.map((t) => (
+                    <tr key={t.id} className="transition-colors hover:bg-slate-50">
+                      <td className="nums px-4 py-3 font-mono text-xs text-slate-500">{t.reference}</td>
+                      <td className="nums px-4 py-3 text-slate-600">
+                        {new Date(t.createdAt).toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={t.status} />
+                      </td>
+                      <td className="nums px-4 py-3 text-right font-medium text-slate-900">{formatMoney(t.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {merchant.transactions.length === 0 && (
+              <p className="px-4 py-10 text-center text-sm text-slate-500">
+                No transactions yet for this merchant.
+              </p>
+            )}
+          </Card>
         </>
       )}
     </>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
   return (
-    <div className="rounded border border-zinc-200 bg-white p-3">
-      <dt className="text-xs uppercase text-zinc-500">{label}</dt>
-      <dd className="font-mono tabular-nums">{value}</dd>
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">{label}</dt>
+      <dd
+        className={`nums mt-1.5 font-semibold ${emphasis ? "text-xl text-slate-900" : "text-lg text-slate-700"}`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
@@ -114,16 +158,16 @@ function StatusControl({ id, status, onChanged }: { id: string; status: string; 
 
   return (
     <div className="text-right">
-      <button
+      <Button
         type="button"
         onClick={onClick}
         disabled={pending}
-        className="rounded border border-zinc-300 bg-white px-3 py-1 text-sm disabled:opacity-50"
+        variant={target === "suspended" ? "danger" : "secondary"}
       >
         {pending ? "Saving…" : target === "suspended" ? "Suspend merchant" : "Reinstate merchant"}
-      </button>
+      </Button>
       {error && (
-        <p role="alert" className="mt-1 text-xs text-red-700">
+        <p role="alert" className="mt-2 max-w-xs text-xs text-rose-700">
           {error}
         </p>
       )}

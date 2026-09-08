@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/app/_ui";
 import { ApiError, NetworkError, SignedOutError } from "@/lib/client/api";
 
 /**
@@ -31,18 +32,28 @@ export function QueryStatus({
 }) {
   if (!error) return null;
   return (
-    <div role="alert" className="mb-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-      {stale ? (
-        <>
-          Showing data as of {loadedAt ? new Date(loadedAt).toLocaleTimeString("en-IN") : "earlier"}; the latest
-          reload failed: {describeError(error)}
-        </>
-      ) : (
-        describeError(error)
-      )}{" "}
-      <button type="button" onClick={reload} disabled={loading} className="underline disabled:opacity-50">
+    <div
+      role="alert"
+      className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+    >
+      <p className="flex min-w-0 items-start gap-2.5">
+        <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-amber-500" />
+        <span>
+          {stale ? (
+            <>
+              Showing data as of {loadedAt ? new Date(loadedAt).toLocaleTimeString("en-IN") : "earlier"}; the latest
+              reload failed: {describeError(error)}
+            </>
+          ) : (
+            describeError(error)
+          )}
+        </span>
+      </p>
+      {/* The label stays "Retry" in every state: it is how the operator finds the
+          control again, and it is what the browser tests click. */}
+      <Button type="button" onClick={reload} disabled={loading} variant="secondary" size="sm">
         Retry
-      </button>
+      </Button>
     </div>
   );
 }
