@@ -2,8 +2,8 @@ import { defineConfig } from "@playwright/test";
 
 /**
  * Browser tests for the token layer. They run against a dev server on :3000
- * (started if not already running) and the local PGlite database.
- * Serial on purpose: the tests share one database and one pair of accounts.
+ * (started if not already running), on mock data unless DATABASE_URL is set.
+ * Serial on purpose: the tests share one data source and one pair of accounts.
  */
 export default defineConfig({
   testDir: "./e2e",
