@@ -15,11 +15,18 @@ Three screens: sign in, merchant list, merchant detail. Everything interesting i
 
 ```bash
 npm install
-npm run db:setup     # migrations + seed into an embedded Postgres (PGlite) under ./.data
 npm run dev          # http://localhost:3000
 ```
 
-No `.env` is needed locally: without `DATABASE_URL` the app uses PGlite (Postgres compiled to WASM, persisted on disk), and without `AUTH_SECRET` it uses a fixed development signing key. Production refuses to start without `AUTH_SECRET`.
+No `.env`, no database, no setup step. With `DATABASE_URL` unset the app runs on **mock data** held in memory (`lib/server/mock/`) and signs tokens with a fixed development key, so it boots anywhere -- including a read-only serverless filesystem.
+
+Set `DATABASE_URL` and it switches to real Postgres over Drizzle instead; that path needs its schema and rows once:
+
+```bash
+DATABASE_URL=... npm run db:setup    # migrations + seed
+```
+
+With a real database attached, production refuses to start without `AUTH_SECRET`.
 
 Other scripts:
 
@@ -35,8 +42,8 @@ npm run build
 ## Stack
 
 - Next.js 16 App Router, TypeScript, Tailwind (unstyled-ish on purpose).
-- Backend: route handlers in the same app under `app/api/`. They are the only code that touches the database.
-- Database: Postgres via Drizzle. Neon (hosted) in production, PGlite (embedded) locally. Same schema, same migrations.
+- Backend: route handlers in the same app under `app/api/`. They are the only code that touches the data source.
+- Data: in-memory mock data by default; Postgres via Drizzle (Neon, PGlite, anything) when `DATABASE_URL` is set. One switch, `lib/server/data-source.ts`, and both sides return the same shapes.
 - Tokens: signed JWT access token (HS256 via `jose`, 60 s by default) + opaque refresh token (SHA-256 stored, 7 days, rotated on every use). Both in `httpOnly` cookies. The lifecycle (`lib/server/auth/tokens.ts`) is our code; `jose` only signs and verifies.
 
 ## Where things are
@@ -45,7 +52,11 @@ npm run build
 proxy.ts                         optimistic gate for page navigations (no DB access)
 lib/server/auth/tokens.ts        the token lifecycle: issue, rotate, grace window, reuse detection
 lib/server/auth/jwt.ts           access token sign/verify
-lib/server/auth/store.ts         persistence interface + memory-store.ts (tests) + drizzle-store.ts (runtime)
+lib/server/auth/store.ts         persistence interface + memory-store.ts (mock mode, tests) + drizzle-store.ts (Postgres)
+lib/server/auth/session-store.ts the one place that picks between the two
+lib/server/data-source.ts        mock data unless DATABASE_URL is set
+lib/server/mock/dataset.ts       the demo operators and merchants (also used to seed Postgres)
+lib/server/mock/store.ts         that dataset, in memory, with stable ids
 lib/server/auth/authenticate.ts  per-request auth for the API, withAuth(handler, { role })
 lib/server/auth/cookies.ts       cookie names and attributes
 lib/client/api.ts                the one fetch wrapper: 401 -> refresh once -> retry once, single-flight across tabs
@@ -61,8 +72,8 @@ tests/**                         token rotation, money, client wrapper
 
 | Variable                       | Default   | Meaning                                                                   |
 | ------------------------------ | --------- | ------------------------------------------------------------------------- |
-| `AUTH_SECRET`                  | dev key   | HS256 key for access tokens. Required (≥32 chars) in production.          |
-| `DATABASE_URL`                 | unset     | Postgres URL. Unset = PGlite in `./.data/pglite`.                          |
+| `AUTH_SECRET`                  | dev key   | HS256 key for access tokens. Required (≥32 chars) in production *when a database is attached*. |
+| `DATABASE_URL`                 | unset     | Postgres URL. Unset = in-memory mock data.                                 |
 | `ACCESS_TOKEN_TTL_SECONDS`     | `60`      | Deliberately short so the refresh path is visible.                         |
 | `REFRESH_TOKEN_TTL_SECONDS`    | `604800`  | 7 days, sliding (each rotation issues a fresh 7-day token).                |
 | `SESSION_ABSOLUTE_TTL_SECONDS` | `2592000` | 30 days from sign-in, regardless of activity.                              |
@@ -83,7 +94,7 @@ Most of these are invisible in ordinary use. Open DevTools → Network (tick "Pr
 | 4   | Same old token presented again within 15 s (two tabs)       | `200`, `rotated: false`: a new access token, no new refresh token, nobody signed out.                      |
 | 5   | Same old token presented after 15 s (theft or a lost reply) | `401 refresh_reuse_detected`.                                                                              |
 | 6   | The newest token in that family                             | `401 session_revoked`: the whole family died with it.                                                      |
-| 7   | An access token that was valid a moment ago                 | `401 session_revoked`: the API checks the session in the database on every request, not just the signature. |
+| 7   | An access token that was valid a moment ago                 | `401 session_revoked`: the API checks the session store on every request, not just the signature.           |
 | 8   | Viewer calls the admin-only action                          | `403 forbidden`, and `/api/auth/me` still works: a permission failure is never a sign-out.                  |
 | 9   | Forged / missing access token                               | `401 token_invalid` / `401 no_token`, each named.                                                          |
 | 10  | Sign out, then present the refresh token                    | `401 session_revoked`.                                                                                     |
@@ -93,7 +104,7 @@ Extra ones you can do by hand:
 - **Cross-site request forgery guard**: `curl -X POST -H 'sec-fetch-site: cross-site' <url>/api/auth/refresh` → `403 cross_site_request`. Cookies are also `SameSite=Lax`, so a browser would not have attached them in the first place.
 - **Timing-safe login**: a wrong password and an unknown email both take one scrypt verification and return the same `401 invalid_credentials`.
 - **Signing key rotation**: change `AUTH_SECRET` and restart. Existing access tokens fail with `token_invalid`; the next request refreshes and carries on. (Locally: `AUTH_SECRET=$(openssl rand -base64 32) npm run dev` after signing in.)
-- **Server restart / redeploy mid-session**: stop and start `npm run dev`. Sessions and refresh tokens are in the database, so nothing is lost.
+- **Server restart / redeploy mid-session**: stop and start `npm run dev`. On Postgres, sessions and refresh tokens survive and nothing is lost. In mock mode they live in memory, so a restart signs everyone out -- see "Mock mode" below.
 
 ### In the browser
 
@@ -116,12 +127,29 @@ Extra ones you can do by hand:
 
 `npm test` runs `tests/money.test.ts`. In the UI, Nandini Textiles shows a settled total of ₹12,59,56,789.01 (the seed contains 12345678901 + 250000000 paise), Chennai Cycle Works includes a −₹3,200.00 refund, and Dilli Book Depot's total is ₹0.99. Amounts travel as `{ amount: "12345678901", currency: "INR", exponent: 2 }`, are summed with `BigInt` (or `sum(bigint)` in Postgres) and formatted digit-by-digit; `grep -rn "parseFloat\|Number(" lib/money` returns nothing.
 
+## Mock mode
+
+Default whenever `DATABASE_URL` is unset. The operators, merchants and transactions in `lib/server/mock/dataset.ts` are built into an in-memory store at first use; sessions and refresh tokens go to the same `MemorySessionStore` the unit tests run against. Nothing touches the filesystem or the network, which is what lets it run on Vercel.
+
+Ids are derived from a stable name (`sha256("merchant:M-1004")`) rather than generated randomly, so every serverless instance agrees on them and a deep link to `/merchants/<id>` still resolves after a cold start lands somewhere else.
+
+What it costs, and it is worth being straight about it:
+
+- **Writes are per-instance and not durable.** Suspending a merchant updates the instance that served the request. A cold start, a redeploy, or a request routed to a second instance shows the merchant back at its seeded status.
+- **Sessions are per-instance too.** A cold start mid-session signs you out; you sign in again and continue. Every case in the tables above still holds within one warm instance, which is what a single reviewer session is.
+
+Both go away by attaching a Postgres URL -- the token lifecycle code is unchanged either way, which is the point of `SessionStore`.
+
 ## Deploying
 
+Import the repo into Vercel and deploy. No environment variables, no database, no setup step -- it comes up on mock data. The proxy and route handlers run on Node.
+
+To deploy it against a real database instead:
+
 1. Create a Postgres database (Neon free tier works) and note the connection string.
-2. Import the repo into Vercel. Set `AUTH_SECRET` (`openssl rand -base64 32`) and `DATABASE_URL`.
+2. Set `DATABASE_URL` and `AUTH_SECRET` (`openssl rand -base64 32`) in the Vercel project.
 3. Run migrations and seed once against that database: `DATABASE_URL=… npm run db:setup`.
-4. Deploy. The proxy and route handlers run on Node.
+4. Redeploy.
 
 ## Tests
 

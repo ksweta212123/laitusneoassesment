@@ -1,13 +1,11 @@
 import "server-only";
-import { eq } from "drizzle-orm";
 import type { NextRequest, NextResponse } from "next/server";
 import type { AuthFailureCode, Role } from "@/lib/shared/auth";
-import { getDb } from "../db/client";
-import { sessions } from "../db/schema";
 import { jsonError } from "../http/responses";
 import { loadTokenConfig } from "./config";
 import { readAccessToken } from "./cookies";
 import { verifyAccessToken, type AccessClaims } from "./jwt";
+import { getSessionStore } from "./session-store";
 import { findUserById, type UserRow } from "./users";
 
 export type AuthContext = {
@@ -19,7 +17,7 @@ export type AuthContext = {
 export type AuthResult = { ok: true; ctx: AuthContext } | { ok: false; reason: AuthFailureCode };
 
 /**
- * Authenticates an API request. The JWT proves who signed it; the database
+ * Authenticates an API request. The JWT proves who signed it; the session store
  * decides whether that session and user are still allowed in. Revoking a
  * session or disabling an operator therefore takes effect on the next request,
  * not when the access token happens to expire.
@@ -31,8 +29,8 @@ export async function authenticate(req: NextRequest): Promise<AuthResult> {
   const verified = await verifyAccessToken(token, loadTokenConfig().secret);
   if (!verified.ok) return { ok: false, reason: verified.reason };
 
-  const db = await getDb();
-  const [session] = await db.select().from(sessions).where(eq(sessions.id, verified.claims.sid)).limit(1);
+  const store = await getSessionStore();
+  const session = await store.getSession(verified.claims.sid);
   if (!session) return { ok: false, reason: "token_invalid" };
   if (session.revokedAt) return { ok: false, reason: "session_revoked" };
   if (session.absoluteExpiresAt <= new Date()) return { ok: false, reason: "session_expired" };
